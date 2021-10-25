@@ -40,6 +40,34 @@ namespace DigitalFoodDiary
             loadFormOne();
         }
 
+        private void checkNewDate(DateTime date)
+        {
+
+            using (SqlConnection sqlCon = new SqlConnection(connectionString))
+            {
+
+                using (SqlCommand command = new SqlCommand("SELECT CASE WHEN EXISTS (SELECT DayoftheWeek FROM TotalCalories WHERE DayoftheWeek = '" + date + "') THEN CAST (1 AS BIT) ELSE CAST (0 AS BIT) END", sqlCon))
+                {
+                    sqlCon.Open();
+
+                    var results = command.ExecuteScalar();
+
+                    if ((bool)results == true)
+                    {
+                        updateTotalCal(dateTimePicker.Value, Int32.Parse(txtbxCalories.Text), cmbbxMealType.SelectedItem.ToString());
+                    }
+                    else
+                    {
+                        command.CommandText = "INSERT INTO dbo.TotalCalories VALUES ('" + dateTimePicker.Text + "', 0, 0, 0, 0)";
+                        command.ExecuteNonQuery();
+                        updateTotalCal(dateTimePicker.Value, Int32.Parse(txtbxCalories.Text), cmbbxMealType.SelectedItem.ToString());
+                    }
+
+                    sqlCon.Close();
+                }
+            }
+        }
+
         private void updateTotalCal(DateTime date, int cal, string type)
         {
             int newCal = 0;
@@ -111,14 +139,14 @@ namespace DigitalFoodDiary
             using (SqlConnection sqlCon = new SqlConnection(connectionString))
             {
 
-                SqlCommand cmd = new SqlCommand();
+                SqlCommand command = new SqlCommand();
 
-                cmd.CommandType = CommandType.Text;
-                cmd.CommandText = String.Format("INSERT INTO dbo.UserInputs VALUES ('" + dateTimePicker.Text + "','" + txtbxCalories.Text + "','" + txtbxFood.Text + "','" + cmbbxMealType.SelectedItem.ToString() + "')");
-                cmd.Connection = sqlCon;
+                command.CommandType = CommandType.Text;
+                command.CommandText = String.Format("INSERT INTO dbo.UserInputs VALUES ('" + dateTimePicker.Text + "','" + txtbxCalories.Text + "','" + txtbxFood.Text + "','" + cmbbxMealType.SelectedItem.ToString() + "')");
+                command.Connection = sqlCon;
 
                 sqlCon.Open();
-                cmd.ExecuteNonQuery();
+                command.ExecuteNonQuery();
 
                 SqlDataAdapter conUserInputes = new SqlDataAdapter("SELECT * FROM UserInputs", sqlCon);
                 DataTable table2 = new DataTable();
@@ -128,7 +156,9 @@ namespace DigitalFoodDiary
 
                 sqlCon.Close();
 
-                updateTotalCal(dateTimePicker.Value, Int32.Parse(txtbxCalories.Text), cmbbxMealType.SelectedItem.ToString());
+                checkNewDate(dateTimePicker.Value);
+                
+                
                 loadFormOne();
             }
 
