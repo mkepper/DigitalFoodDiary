@@ -20,33 +20,51 @@ namespace DigitalFoodDiary
             InitializeComponent();
         }
 
-        private void loadFormOne()
+        private void loadGraph()
         {
-            using (SqlConnection sqlCon = new SqlConnection(connectionString))
+            SqlConnection sqlCon = new SqlConnection(connectionString);
+
+            SqlCommand cmd = sqlCon.CreateCommand();
+            cmd.CommandText = "SELECT DayoftheWeek, Total FROM TotalPerDay WHERE DayoftheWeek >= DATEADD(day, -7, GETDATE())";
+            SqlDataReader myReader;
+
+            
+            try
             {
                 sqlCon.Open();
-                SqlDataAdapter conTotalCal = new SqlDataAdapter("SELECT * FROM TotalCalories", sqlCon);
-                DataTable table1 = new DataTable();
-                conTotalCal.Fill(table1);
+                myReader = cmd.ExecuteReader();
 
-                dtaGVTotalCal.DataSource = table1;
 
-                sqlCon.Close();
+                this.chrtLineGraph.Series["Total"].Points.Clear();
+            while (myReader.Read())
+            {
+
+            chrtLineGraph.Series["Total"].Points.AddXY(myReader["DayoftheWeek"], myReader["Total"].ToString());
+
             }
+
+            }
+            catch(Exception ex)
+            {
+            MessageBox.Show(ex.Message);
+            }
+
+                
+            
         }
 
     private void Form1_Load(object sender, EventArgs e)
         {
-            loadFormOne();
+            loadGraph();
         }
 
-        private void checkNewDate(DateTime date)
+        private void checkNewDate()
         {
 
             using (SqlConnection sqlCon = new SqlConnection(connectionString))
             {
 
-                using (SqlCommand command = new SqlCommand("SELECT CASE WHEN EXISTS (SELECT DayoftheWeek FROM TotalCalories WHERE DayoftheWeek = '" + date + "') THEN CAST (1 AS BIT) ELSE CAST (0 AS BIT) END", sqlCon))
+                using (SqlCommand command = new SqlCommand("SELECT CASE WHEN EXISTS (SELECT DayoftheWeek FROM TotalCalories WHERE DayoftheWeek = '" + dateTimePicker.Text + "') THEN CAST (1 AS BIT) ELSE CAST (0 AS BIT) END", sqlCon))
                 {
                     sqlCon.Open();
 
@@ -60,6 +78,8 @@ namespace DigitalFoodDiary
                     {
                         command.CommandText = "INSERT INTO dbo.TotalCalories VALUES ('" + dateTimePicker.Text + "', 0, 0, 0, 0)";
                         command.ExecuteNonQuery();
+                        command.CommandText = "INSERT INTO dbo.TotalPerDay VALUES ('" + dateTimePicker.Text + "', 0)";
+                        command.ExecuteNonQuery();
                         updateTotalCal(dateTimePicker.Value, Int32.Parse(txtbxCalories.Text), cmbbxMealType.SelectedItem.ToString());
                     }
 
@@ -68,6 +88,8 @@ namespace DigitalFoodDiary
             }
         }
 
+        
+
         private void updateTotalCal(DateTime date, int cal, string type)
         {
             int newCal = 0;
@@ -75,6 +97,7 @@ namespace DigitalFoodDiary
             int lunchCal = 0;
             int dinnerCal = 0;
             int snacksCal = 0;
+            int total = 0;
             string cmdString = "";
 
             using (SqlConnection sqlCon = new SqlConnection(connectionString))
@@ -96,7 +119,7 @@ namespace DigitalFoodDiary
                         }
                     }
 
-                    
+                    total = breakfastCal + lunchCal + dinnerCal + snacksCal + Convert.ToInt32(txtbxCalories.Text);
 
                     if (type == "Breakfast")
                     {
@@ -119,14 +142,20 @@ namespace DigitalFoodDiary
                         cmdString = "UPDATE dbo.TotalCalories SET SnacksCal = '" + newCal + "' WHERE DayoftheWeek = '" + date + "'";
                     }
 
+                    
+
                     sqlCon.Close();
                     sqlCon.Open();
 
                     SqlCommand cmd = new SqlCommand(cmdString, sqlCon);
                     cmd.ExecuteNonQuery();
+                    cmdString = "Update dbo.TotalPerDay SET Total = '" + total + "' WHERE DayoftheWeek = '" + date + "'";
+                    SqlCommand comd = new SqlCommand(cmdString, sqlCon);
+                    comd.ExecuteNonQuery();
 
                     reader.Close();
                     sqlCon.Close();
+                    loadGraph();
 
                 }
             }
@@ -136,35 +165,45 @@ namespace DigitalFoodDiary
 
         private void btnAddMeal_Click(object sender, EventArgs e)
         {
-            using (SqlConnection sqlCon = new SqlConnection(connectionString))
+            int calories;
+            if (int.TryParse(txtbxCalories.Text, out calories))
             {
 
-                SqlCommand command = new SqlCommand();
+                using (SqlConnection sqlCon = new SqlConnection(connectionString))
+                {
 
-                command.CommandType = CommandType.Text;
-                command.CommandText = String.Format("INSERT INTO dbo.UserInputs VALUES ('" + dateTimePicker.Text + "','" + txtbxCalories.Text + "','" + txtbxFood.Text + "','" + cmbbxMealType.SelectedItem.ToString() + "')");
-                command.Connection = sqlCon;
+                    SqlCommand command = new SqlCommand();
 
-                sqlCon.Open();
-                command.ExecuteNonQuery();
+                    command.CommandType = CommandType.Text;
+                    command.CommandText = String.Format("INSERT INTO dbo.UserInputs (DayoftheWeek, Calories, NameofFood, MealType) VALUES ('" + dateTimePicker.Text + "','" + calories + "','" + txtbxFood.Text + "','" + cmbbxMealType.SelectedItem.ToString() + "')");
+                    command.Connection = sqlCon;
 
-                SqlDataAdapter conUserInputes = new SqlDataAdapter("SELECT * FROM UserInputs", sqlCon);
-                DataTable table2 = new DataTable();
-                conUserInputes.Fill(table2);
+                    sqlCon.Open();
+                    command.ExecuteNonQuery();
 
-                dtaUITotalCal.DataSource = table2;
+                    SqlDataAdapter conUserInputes = new SqlDataAdapter("SELECT * FROM UserInputs", sqlCon);
+                    DataTable table2 = new DataTable();
+                    conUserInputes.Fill(table2);
 
-                sqlCon.Close();
+                    dtaUITotalCal.DataSource = table2;
 
-                checkNewDate(dateTimePicker.Value);
-                
-                
-                loadFormOne();
+                    sqlCon.Close();
+
+                    checkNewDate();
+
+                }
+
             }
+            else
+            {
+                MessageBox.Show("Please provide a number value only for calories");
+                txtbxCalories.Clear();
+            }
+            
 
         }
 
-        
-        
     }
 }
+    
+
